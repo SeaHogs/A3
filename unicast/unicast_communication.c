@@ -35,27 +35,26 @@ void input_callback(const void *data, uint16_t len,
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(unicast_process, ev, data)
 {
-  static struct etimer periodic_timer;
-  static unsigned count = 0;
-
+  PROCESS_EXITHANDLER(unicast_close(&uc);)
   PROCESS_BEGIN();
 
+  unicast_open(&uc, 146, &unicast_callbacks);
 
-
-  /* Initialize NullNet */
-  nullnet_buf = (uint8_t *)&count; //data transmitted
-  nullnet_len = sizeof(count); //length of data transmitted
-  nullnet_set_input_callback(input_callback); //initialize receiver callback
-
-  if(!linkaddr_cmp(&dest_addr, &linkaddr_node_addr)) { //ensures destination is not same as sender
+  if(!linkaddr_cmp(&dest_addr, &linkaddr_node_addr)) {
     etimer_set(&periodic_timer, SEND_INTERVAL);
     while(1) {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-      LOG_INFO("Sending %u to ", count);
+      
+      char buf[20];
+      snprintf(buf, sizeof(buf), "Count %u", count);
+      packetbuf_copyfrom(buf, strlen(buf));
+
+      LOG_INFO("Sending unicast to ");
       LOG_INFO_LLADDR(&dest_addr);
       LOG_INFO_("\n");
 
-      NETSTACK_NETWORK.output(&dest_addr); //Packet transmission
+      unicast_send(&uc, &dest_addr);
+      
       count++;
       etimer_reset(&periodic_timer);
     }
